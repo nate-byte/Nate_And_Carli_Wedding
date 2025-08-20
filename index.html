@@ -15,7 +15,6 @@
       --lav:#c084fc;    /* primary */
       --lav-strong:#a855f7;
       --blush:#f8e7f1;  /* accents */
-      --gold:#f9d977;
       --ok:#10b981;
       --err:#ef4444;
       --radius:20px;
@@ -25,8 +24,7 @@
     body{
       margin:0; color:var(--ink);
       font-family:Inter, system-ui, -apple-system, Segoe UI, Roboto, sans-serif;
-      background:
-        radial-gradient(40rem 40rem at 10% 0%, var(--bg2) 0%, var(--bg1) 100%);
+      background: radial-gradient(40rem 40rem at 10% 0%, var(--bg2) 0%, var(--bg1) 100%);
     }
     .wrap{max-width:1000px;margin:0 auto;padding:2rem 1rem 4rem}
     header{
@@ -49,6 +47,12 @@
       letter-spacing:.5px;
     }
     .subtitle{color:var(--muted); margin:0 auto; max-width:40rem; font-size:1.05rem}
+    .toolbar { display:flex; justify-content:center; gap:.6rem; margin-top:1rem; flex-wrap:wrap; }
+    .btn{ display:inline-block; padding:.8rem 1.25rem; border-radius:14px; font-weight:700; border:none; cursor:pointer; }
+    .btn.primary{ background:var(--lav); color:#fff }
+    .btn.primary:hover{ background:var(--lav-strong) }
+    .btn.secondary{ background:#fff; border:1px solid #e5e7eb }
+    .btn.ghost{ background:transparent; border:1px dashed #d1d5db; }
     .card{
       background:#fff; border-radius:var(--radius); box-shadow:var(--shadow);
       padding:1.25rem; margin-top:1.25rem;
@@ -58,20 +62,11 @@
 
     .drop{
       border:2.5px dashed #e5e7eb; border-radius:var(--radius);
-      padding:1.25rem; text-align:center; transition:.25s;
-      background: #fff;
+      padding:1.25rem; text-align:center; transition:.25s; background:#fff;
     }
     .drop.dragover{ background:#faf5ff; border-color:var(--lav) }
     .drop h2{ margin:.25rem 0 .25rem; font-size:1.2rem }
     .drop .hint{ color:var(--muted); margin:.35rem 0 .85rem }
-    .btn{
-      display:inline-block; padding:.8rem 1.25rem; border-radius:14px;
-      font-weight:700; border:none; cursor:pointer;
-    }
-    .btn.primary{ background:var(--lav); color:#fff }
-    .btn.primary:hover{ background:var(--lav-strong) }
-    .btn.secondary{ background:#fff; border:1px solid #e5e7eb }
-    .actions{ display:flex; gap:.6rem; align-items:center; justify-content:center; margin-top:.75rem }
 
     .thumbs{ display:grid; grid-template-columns: repeat(auto-fill, minmax(140px,1fr)); gap:.75rem; margin-top:1rem }
     .thumb{ border:1px solid #eee; border-radius:14px; overflow:hidden; background:#fafafa }
@@ -93,7 +88,19 @@
     footer{ text-align:center; color:var(--muted); margin-top:2rem; font-size:.95rem }
     .brand{ font-weight:700; color:var(--lav-strong) }
 
-    /* simple confetti dots */
+    /* Modal */
+    .modal-backdrop{ position:fixed; inset:0; background:rgba(17,24,39,.55); display:none; align-items:center; justify-content:center; padding:1rem; z-index:50; }
+    .modal{ background:#fff; border-radius:18px; width:min(520px, 92vw); box-shadow:var(--shadow); padding:1rem; }
+    .modal header{ background:transparent; box-shadow:none; padding: .75rem 1rem 0; }
+    .modal h3{ font-family:'Playfair Display', serif; margin:.25rem 0 .25rem; }
+    .modal .body{ padding: 0 1rem 1rem; }
+    .qr-box{ display:flex; gap:1rem; align-items:center; justify-content:space-between; flex-wrap:wrap; }
+    .qr-img{ width:220px; height:220px; border-radius:14px; border:1px solid #eee; background:#fff; display:grid; place-items:center; overflow:hidden; }
+    .qr-img img{ width:100%; height:100%; object-fit:contain; }
+    .close-row{ display:flex; gap:.6rem; justify-content:flex-end; padding:0 1rem 1rem; }
+    .muted{ color:var(--muted); }
+
+    /* confetti */
     .confetti{ position:fixed; top:0; left:0; width:100%; height:0; pointer-events:none; overflow:visible }
   </style>
 </head>
@@ -103,6 +110,9 @@
     <header>
       <h1>Share Your Photos</h1>
       <p class="subtitle">Help us capture every memory from <strong>Carli & Nate’s</strong> big day. Drop photos or short videos below — no app or login required.</p>
+      <div class="toolbar">
+        <button id="openQr" class="btn ghost">📱 Scan to Upload (QR)</button>
+      </div>
     </header>
 
     <div class="grid">
@@ -144,6 +154,32 @@
     <footer>
       Thank you for celebrating with us ♥ &nbsp;·&nbsp; <span class="brand">C & N</span>
     </footer>
+  </div>
+
+  <!-- QR Modal -->
+  <div class="modal-backdrop" id="qrModal">
+    <div class="modal">
+      <header>
+        <h3>Scan to Upload</h3>
+        <p class="muted" id="qrUrlText" style="word-break:break-all;"></p>
+      </header>
+      <div class="body">
+        <div class="qr-box">
+          <div class="qr-img"><img id="qrImage" alt="QR code to this page"></div>
+          <div style="flex:1; min-width:220px">
+            <p class="muted">Point your camera at the QR to open this exact page on your phone.</p>
+            <div style="display:flex; gap:.5rem; flex-wrap:wrap; margin-top:.5rem">
+              <button id="copyUrl" class="btn secondary">Copy URL</button>
+              <button id="printQr" class="btn secondary">Print QR</button>
+              <a id="downloadQr" class="btn primary" download="scan-to-upload.png">Download PNG</a>
+            </div>
+          </div>
+        </div>
+      </div>
+      <div class="close-row">
+        <button id="closeQr" class="btn secondary">Close</button>
+      </div>
+    </div>
   </div>
 
   <script>
@@ -273,6 +309,49 @@
         showToast('Something went wrong. Please try again.', 'err');
         uploadBtn.disabled = false;
       }
+    });
+
+    // --- QR modal logic (uses external QR image service)
+    const modal = document.getElementById('qrModal');
+    const openQr = document.getElementById('openQr');
+    const closeQr = document.getElementById('closeQr');
+    const qrImage = document.getElementById('qrImage');
+    const downloadQr = document.getElementById('downloadQr');
+    const printQr = document.getElementById('printQr');
+    const copyUrlBtn = document.getElementById('copyUrl');
+    const qrUrlText = document.getElementById('qrUrlText');
+
+    function currentUrl(){ return window.location.href.split('#')[0]; }
+    function buildQrUrl(u){
+      const enc = encodeURIComponent(u);
+      // Using qrserver.com for simple QR image generation
+      return `https://api.qrserver.com/v1/create-qr-code/?data=${enc}&size=220x220&margin=1`;
+    }
+    function openModal(){
+      const u = currentUrl();
+      qrUrlText.textContent = u;
+      const imgUrl = buildQrUrl(u);
+      qrImage.src = imgUrl;
+      downloadQr.href = imgUrl;
+      modal.style.display = 'flex';
+    }
+    function closeModal(){ modal.style.display = 'none'; }
+
+    openQr.addEventListener('click', openModal);
+    closeQr.addEventListener('click', closeModal);
+    modal.addEventListener('click', (e)=>{ if (e.target === modal) closeModal(); });
+
+    copyUrlBtn.addEventListener('click', async ()=>{
+      try{ await navigator.clipboard.writeText(currentUrl()); copyUrlBtn.textContent = 'Copied!'; setTimeout(()=>copyUrlBtn.textContent='Copy URL',1200); }
+      catch{ alert('Copy failed — select and copy the URL manually.'); }
+    });
+    printQr.addEventListener('click', ()=>{
+      const u = currentUrl(); const src = buildQrUrl(u);
+      const w = window.open('', '_blank');
+      w.document.write(`<img src="${src}" style="width:320px;height:320px;display:block;margin:40px auto 10px"><p style="text-align:center;font-family:sans-serif">${u}</p>`);
+      w.document.close();
+      w.focus();
+      w.print();
     });
   </script>
 </body>
