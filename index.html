@@ -1,27 +1,279 @@
 <!DOCTYPE html>
-<html>
-  <head><meta charset='UTF-8'><title>Wedding Upload</title></head>
-  <body>
-    <h1>Upload Photos</h1>
-    <input type="file" id="fileInput" multiple>
-    <button id="uploadBtn">Upload</button>
-    <pre id="out"></pre>
-    <script>
-      async function sign(file){
-        const r = await fetch(`/api/sign-upload?filename=${encodeURIComponent(file.name)}&type=${file.type}&size=${file.size}`);
-        return r.json();
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Carli & Nate — Share Your Photos</title>
+  <meta name="description" content="Upload wedding photos and videos for Carli & Nate. No app or login required." />
+  <link href="https://fonts.googleapis.com/css2?family=Playfair+Display:wght@600;700&family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+  <style>
+    :root{
+      --ink:#1f2937;
+      --muted:#6b7280;
+      --bg1:#fffaf7;
+      --bg2:#ffffff;
+      --lav:#c084fc;    /* primary */
+      --lav-strong:#a855f7;
+      --blush:#f8e7f1;  /* accents */
+      --gold:#f9d977;
+      --ok:#10b981;
+      --err:#ef4444;
+      --radius:20px;
+      --shadow:0 20px 45px rgba(0,0,0,.08);
+    }
+    *{box-sizing:border-box}
+    body{
+      margin:0; color:var(--ink);
+      font-family:Inter, system-ui, -apple-system, Segoe UI, Roboto, sans-serif;
+      background:
+        radial-gradient(40rem 40rem at 10% 0%, var(--bg2) 0%, var(--bg1) 100%);
+    }
+    .wrap{max-width:1000px;margin:0 auto;padding:2rem 1rem 4rem}
+    header{
+      border-radius:var(--radius);
+      padding:3rem 1.25rem 2rem;
+      text-align:center;
+      background: linear-gradient(160deg,#fff, var(--blush) 90%);
+      box-shadow: var(--shadow);
+      position:relative; overflow:hidden;
+    }
+    header:after{
+      content:""; position:absolute; inset:-2px;
+      background: radial-gradient(28rem 28rem at 110% -10%, rgba(192,132,252,.18), transparent 60%);
+      pointer-events:none;
+    }
+    h1{
+      font-family:'Playfair Display', serif;
+      font-size: clamp(2rem, 4.5vw, 3rem);
+      margin:0 0 .5rem;
+      letter-spacing:.5px;
+    }
+    .subtitle{color:var(--muted); margin:0 auto; max-width:40rem; font-size:1.05rem}
+    .card{
+      background:#fff; border-radius:var(--radius); box-shadow:var(--shadow);
+      padding:1.25rem; margin-top:1.25rem;
+    }
+    .grid{display:grid; grid-template-columns: 1fr; gap:1rem}
+    @media(min-width:900px){ .grid{ grid-template-columns:1.3fr .7fr } }
+
+    .drop{
+      border:2.5px dashed #e5e7eb; border-radius:var(--radius);
+      padding:1.25rem; text-align:center; transition:.25s;
+      background: #fff;
+    }
+    .drop.dragover{ background:#faf5ff; border-color:var(--lav) }
+    .drop h2{ margin:.25rem 0 .25rem; font-size:1.2rem }
+    .drop .hint{ color:var(--muted); margin:.35rem 0 .85rem }
+    .btn{
+      display:inline-block; padding:.8rem 1.25rem; border-radius:14px;
+      font-weight:700; border:none; cursor:pointer;
+    }
+    .btn.primary{ background:var(--lav); color:#fff }
+    .btn.primary:hover{ background:var(--lav-strong) }
+    .btn.secondary{ background:#fff; border:1px solid #e5e7eb }
+    .actions{ display:flex; gap:.6rem; align-items:center; justify-content:center; margin-top:.75rem }
+
+    .thumbs{ display:grid; grid-template-columns: repeat(auto-fill, minmax(140px,1fr)); gap:.75rem; margin-top:1rem }
+    .thumb{ border:1px solid #eee; border-radius:14px; overflow:hidden; background:#fafafa }
+    .thumb img,.thumb video{ width:100%; height:140px; object-fit:cover; display:block }
+    .meta{ display:flex; align-items:center; justify-content:space-between; padding:.5rem .6rem; font-size:.85rem; color:var(--muted) }
+    .remove{ border:none; background:transparent; color:var(--err); font-weight:700; cursor:pointer }
+
+    .progress{ height:12px; background:#eef2ff; border-radius:999px; overflow:hidden; margin-top:.85rem }
+    .bar{ height:100%; width:0%; background: linear-gradient(90deg, var(--lav), #60a5fa) }
+
+    .tip{ font-size:.9rem; color:var(--muted); }
+    .list{ margin:.4rem 0 .6rem; padding-left:1.1rem }
+    .list li{ margin:.25rem 0 }
+
+    .toast{ margin-top:1rem; padding:.7rem .9rem; border-radius:12px; display:none; }
+    .toast.ok{ display:block; background:#ecfdf5; color:#065f46; border:1px solid #a7f3d0 }
+    .toast.err{ display:block; background:#fef2f2; color:#991b1b; border:1px solid #fecaca }
+
+    footer{ text-align:center; color:var(--muted); margin-top:2rem; font-size:.95rem }
+    .brand{ font-weight:700; color:var(--lav-strong) }
+
+    /* simple confetti dots */
+    .confetti{ position:fixed; top:0; left:0; width:100%; height:0; pointer-events:none; overflow:visible }
+  </style>
+</head>
+<body>
+  <svg class="confetti" id="confetti"></svg>
+  <div class="wrap">
+    <header>
+      <h1>Share Your Photos</h1>
+      <p class="subtitle">Help us capture every memory from <strong>Carli & Nate’s</strong> big day. Drop photos or short videos below — no app or login required.</p>
+    </header>
+
+    <div class="grid">
+      <section class="card">
+        <div id="drop" class="drop" tabindex="0" aria-label="Upload dropzone">
+          <h2>Drag & drop files here</h2>
+          <p class="hint">or</p>
+          <label class="btn secondary" for="fileInput">Choose files</label>
+          <input id="fileInput" type="file" multiple accept="image/*,video/mp4,video/quicktime" style="display:none" />
+          <p class="hint" style="margin-top:.75rem">Max per file <span id="maxSize">50</span> MB · Allowed: JPG/PNG/HEIC/MP4/MOV</p>
+        </div>
+
+        <div id="thumbs" class="thumbs" aria-live="polite"></div>
+
+        <div class="actions">
+          <button id="uploadBtn" class="btn primary" disabled>✨ Send My Photos</button>
+          <button id="clearBtn"  class="btn secondary">Clear</button>
+        </div>
+
+        <div class="progress" aria-label="overall upload progress">
+          <div id="overallBar" class="bar"></div>
+        </div>
+
+        <div id="toast" class="toast"></div>
+      </section>
+
+      <aside class="card">
+        <h3 style="margin:.25rem 0 .5rem; font-family:'Playfair Display',serif;">Tips</h3>
+        <ul class="list tip">
+          <li>Pick your favorites; keep videos under 60s if you can.</li>
+          <li>If cell service is weak, it still works — uploads just take longer.</li>
+          <li>By uploading, you’re ok with us downloading these later.</li>
+        </ul>
+        <hr style="border:none;border-top:1px solid #eee;margin:1rem 0;">
+        <p class="tip">Having trouble? Try again in a moment, or choose smaller files.</p>
+      </aside>
+    </div>
+
+    <footer>
+      Thank you for celebrating with us ♥ &nbsp;·&nbsp; <span class="brand">C & N</span>
+    </footer>
+  </div>
+
+  <script>
+    // --- helpers
+    const $ = (sel) => document.querySelector(sel);
+    const fileInput = $('#fileInput');
+    const drop = $('#drop');
+    const thumbs = $('#thumbs');
+    const uploadBtn = $('#uploadBtn');
+    const clearBtn = $('#clearBtn');
+    const overallBar = $('#overallBar');
+    const toast = $('#toast');
+    const MAX_MB = parseInt($('#maxSize').textContent, 10) || 50;
+
+    let queue = [];
+    const bytesToMB = (b)=> (b / (1024*1024)).toFixed(1);
+    const showToast = (msg, type='ok') => { toast.textContent = msg; toast.className = 'toast ' + type; setTimeout(()=>{ toast.className='toast'; }, 4500); };
+    const updateButtons = () => { uploadBtn.disabled = queue.length === 0; };
+
+    // --- confetti (SVG circles)
+    function confettiBurst() {
+      const svg = document.getElementById('confetti');
+      svg.innerHTML = '';
+      const W = window.innerWidth, H = window.innerHeight;
+      const colors = ['#c084fc', '#f472b6', '#60a5fa', '#f59e0b', '#34d399'];
+      for (let i=0;i<120;i++){
+        const c = document.createElementNS('http://www.w3.org/2000/svg', 'circle');
+        const x = Math.random()*W, y = -20;
+        const r = Math.random()*4+2;
+        c.setAttribute('cx', x); c.setAttribute('cy', y); c.setAttribute('r', r);
+        c.setAttribute('fill', colors[Math.floor(Math.random()*colors.length)]);
+        svg.appendChild(c);
+        const dy = (Math.random()*H) + 80;
+        const dx = (Math.random()*120) - 60;
+        c.animate([{transform:`translate(0,0)`}, {transform:`translate(${dx}px, ${dy}px)`}], {duration: 1400 + Math.random()*800, easing:'cubic-bezier(.2,.8,.2,1)', fill:'forwards'});
       }
-      document.getElementById('uploadBtn').onclick = async () => {
-        const files = document.getElementById('fileInput').files;
-        for (const f of files){
-          const {url, fields} = await sign(f);
+      setTimeout(()=> svg.innerHTML='', 2200);
+    }
+
+    // --- add files
+    function addFiles(files){
+      for (const f of files){
+        if (f.size > MAX_MB * 1024 * 1024){ showToast(`${f.name} is ${bytesToMB(f.size)}MB — over the ${MAX_MB}MB limit`, 'err'); continue; }
+        const id = crypto.randomUUID();
+        queue.push({ id, file: f });
+        const el = document.createElement('div'); el.className='thumb'; el.id = `thumb-${id}`;
+        const url = URL.createObjectURL(f); const isVideo = f.type.startsWith('video/');
+        el.innerHTML = `${isVideo ? `<video src="${url}" muted></video>` : `<img src="${url}" alt="${f.name}">`}
+          <div class="meta">
+            <span title="${f.name}">${f.name.length>20? f.name.slice(0,18)+'…': f.name}</span>
+            <button class="remove" data-id="${id}">Remove</button>
+          </div>
+          <div class="progress"><div class="bar" id="bar-${id}"></div></div>`;
+        thumbs.appendChild(el);
+      }
+      updateButtons();
+    }
+
+    // --- drag & drop
+    drop.addEventListener('dragover', e=>{ e.preventDefault(); drop.classList.add('dragover'); });
+    drop.addEventListener('dragleave', ()=> drop.classList.remove('dragover'));
+    drop.addEventListener('drop', e=>{ e.preventDefault(); drop.classList.remove('dragover'); addFiles(e.dataTransfer.files); });
+    drop.addEventListener('click', ()=> fileInput.click());
+    fileInput.addEventListener('change', e=> addFiles(e.target.files));
+
+    // --- remove/clear
+    thumbs.addEventListener('click', e=>{
+      if (e.target.classList.contains('remove')){
+        const id = e.target.getAttribute('data-id');
+        queue = queue.filter(q=> q.id !== id);
+        document.getElementById(`thumb-${id}`)?.remove();
+        updateButtons();
+      }
+    });
+    clearBtn.addEventListener('click', ()=>{ queue = []; thumbs.innerHTML=''; updateButtons(); overallBar.style.width='0%'; });
+
+    // --- server sign
+    async function sign(file){
+      const res = await fetch(`/api/sign-upload?filename=${encodeURIComponent(file.name)}&type=${encodeURIComponent(file.type)}&size=${file.size}`);
+      if (!res.ok) throw new Error('Sign failed');
+      return res.json();
+    }
+
+    // --- upload single
+    async function uploadOne(item){
+      const { file, id } = item;
+      const bar = document.getElementById(`bar-${id}`);
+      const { method='POST', url, fields } = await sign(file);
+
+      return new Promise((resolve, reject)=>{
+        const xhr = new XMLHttpRequest();
+        if (method === 'POST'){
           const fd = new FormData();
-          for (const [k,v] of Object.entries(fields)) fd.append(k,v);
-          fd.append('file', f);
-          await fetch(url, {method:'POST', body:fd});
-          document.getElementById('out').textContent += `Uploaded ${f.name}\n`;
+          Object.entries(fields).forEach(([k,v])=> fd.append(k,v));
+          fd.append('file', file);
+          xhr.open('POST', url, true);
+          xhr.upload.onprogress = e=>{ if (e.lengthComputable) bar.style.width = (e.loaded/e.total*100)+'%'; };
+          xhr.onload = ()=> (xhr.status>=200 && xhr.status<300) ? resolve() : reject(new Error('Upload failed'));
+          xhr.onerror = ()=> reject(new Error('Network error'));
+          xhr.send(fd);
+        } else {
+          xhr.open('PUT', url, true);
+          xhr.setRequestHeader('Content-Type', file.type || 'application/octet-stream');
+          xhr.upload.onprogress = e=>{ if (e.lengthComputable) bar.style.width = (e.loaded/e.total*100)+'%'; };
+          xhr.onload = ()=> (xhr.status>=200 && xhr.status<300) ? resolve() : reject(new Error('Upload failed'));
+          xhr.onerror = ()=> reject(new Error('Network error'));
+          xhr.send(file);
         }
-      };
-    </script>
-  </body>
+      });
+    }
+
+    // --- upload all
+    uploadBtn.addEventListener('click', async ()=>{
+      if (queue.length === 0) return;
+      uploadBtn.disabled = true; overallBar.style.width='0%';
+      let done = 0;
+      try{
+        for (const item of queue){
+          await uploadOne(item);
+          done++; overallBar.style.width = (done/queue.length*100)+'%';
+        }
+        showToast('Upload complete — thank you!');
+        confettiBurst();
+        queue = []; thumbs.innerHTML=''; updateButtons();
+      }catch(err){
+        console.error(err);
+        showToast('Something went wrong. Please try again.', 'err');
+        uploadBtn.disabled = false;
+      }
+    });
+  </script>
+</body>
 </html>
