@@ -1,0 +1,27 @@
+<!DOCTYPE html>
+<html>
+  <head><meta charset='UTF-8'><title>Wedding Upload</title></head>
+  <body>
+    <h1>Upload Photos</h1>
+    <input type="file" id="fileInput" multiple>
+    <button id="uploadBtn">Upload</button>
+    <pre id="out"></pre>
+    <script>
+      async function sign(file){
+        const r = await fetch(`/api/sign-upload?filename=${encodeURIComponent(file.name)}&type=${file.type}&size=${file.size}`);
+        return r.json();
+      }
+      document.getElementById('uploadBtn').onclick = async () => {
+        const files = document.getElementById('fileInput').files;
+        for (const f of files){
+          const {url, fields} = await sign(f);
+          const fd = new FormData();
+          for (const [k,v] of Object.entries(fields)) fd.append(k,v);
+          fd.append('file', f);
+          await fetch(url, {method:'POST', body:fd});
+          document.getElementById('out').textContent += `Uploaded ${f.name}\n`;
+        }
+      };
+    </script>
+  </body>
+</html>
